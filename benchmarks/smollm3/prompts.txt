@@ -1,0 +1,10 @@
+Explain the concept of "surprise" in active inference and why a brain would try to minimize it.
+Write a short poem about a neural network learning to dream.
+What is the unification of text, image, and audio into a single latent space and why is it powerful?
+Implement a Python function that checks if a string is a palindrome.
+Describe the difference between variational free energy and expected free energy.
+If a train travels 120 km in 1.5 hours, what is its average speed in km/h?
+Explain what a "Teacher" model might be in a self-improving AI system.
+Write three sentences comparing recurrent neural networks and transformers.
+What is the meaning of life, according to an embodied AI that must minimize free energy?
+Give a brief plan to build a perception layer that turns raw signals (text, image, audio) into tokens.

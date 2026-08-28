@@ -1,0 +1,75 @@
+name: SmolLM3-3B Benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'benchmarks/smollm3/**'
+      - '.github/workflows/smollm3-benchmark.yml'
+
+env:
+  MODEL_ID: HuggingFaceTB/SmolLM3-3B
+  MODEL_DIR: models/SmolLM3-3B
+  GGUF_DIR: gguf/SmolLM3-3B
+  MAX_NEW_TOKENS: "256"
+  REPORT_DIR: results
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache models
+        uses: actions/cache@v4
+        with:
+          path: |
+            models
+            gguf
+          key: smollm3-3b-v1
+
+      - name: Install CPU deps
+        run: |
+          pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "transformers>=4.53,<5" accelerate psutil huggingface_hub
+          pip install llama-cpp-python
+
+      - name: Clone model repo (HF snapshot)
+        run: |
+          python -c "
+          from huggingface_hub import snapshot_download
+          snapshot_download(
+              repo_id='$MODEL_ID',
+              local_dir='$MODEL_DIR',
+              allow_patterns=['*.json', '*.model', '*.safetensors', 'tokenizer*'],
+          )
+          ls -laR '$MODEL_DIR' | head -40
+          "
+
+      - name: Run benchmark (10 prompts)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python benchmarks/smollm3/benchmark_smollm3.py \
+            --model-id "$MODEL_ID" \
+            --local-dir "$MODEL_DIR" \
+            --gguf-local-dir "$GGUF_DIR" \
+            --prompts-file benchmarks/smollm3/prompts.txt \
+            --report-dir "$REPORT_DIR" \
+            --max-new-tokens "$MAX_NEW_TOKENS"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: smollm3-benchmark
+          path: |
+            results/**/*
+          if-no-files-found: error

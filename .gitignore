@@ -1,0 +1,5 @@
+models/
+gguf/
+results/
+__pycache__/
+*.pyc
