@@ -100,8 +100,9 @@ def _walk_gguf(root):
             yield os.path.join(dirpath, f)
 
 
-def gen_transformers(ctx, prompt, device, max_new_tokens):
+def gen_transformers(ctx, prompt, max_new_tokens):
     tokenizer, model = ctx["tokenizer"], ctx["model"]
+    device = ctx["device"]
     messages = [{"role": "user", "content": prompt}]
     inputs = tokenizer.apply_chat_template(
         messages, add_generation_prompt=True, return_tensors="pt"
