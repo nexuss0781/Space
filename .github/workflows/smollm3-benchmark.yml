@@ -44,15 +44,16 @@ jobs:
 
       - name: Clone model repo (HF snapshot)
         run: |
-          python -c "
+          python - <<'PY'
+          import os
           from huggingface_hub import snapshot_download
           snapshot_download(
-              repo_id='$MODEL_ID',
-              local_dir='$MODEL_DIR',
+              repo_id=os.environ['MODEL_ID'],
+              local_dir=os.environ['MODEL_DIR'],
               allow_patterns=['*.json', '*.model', '*.safetensors', 'tokenizer*'],
           )
-          ls -laR '$MODEL_DIR' | head -40
-          "
+          PY
+          ls -laR "$MODEL_DIR" | head -40
 
       - name: Run benchmark (10 prompts)
         env:
