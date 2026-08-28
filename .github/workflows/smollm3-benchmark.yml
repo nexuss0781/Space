@@ -33,7 +33,7 @@ jobs:
           path: |
             models
             gguf
-          key: smollm3-3b-v1
+          key: smollm3-3b-v3
 
       - name: Install CPU deps
         run: |
@@ -50,7 +50,6 @@ jobs:
           snapshot_download(
               repo_id=os.environ['MODEL_ID'],
               local_dir=os.environ['MODEL_DIR'],
-              allow_patterns=['*.json', '*.model', '*.safetensors', 'tokenizer*'],
           )
           PY
           ls -laR "$MODEL_DIR" | head -40

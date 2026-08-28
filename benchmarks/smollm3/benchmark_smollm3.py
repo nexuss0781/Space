@@ -49,7 +49,7 @@ def load_transformers(model_id, local_dir, device, dtype, hf_token):
     tokenizer = AutoTokenizer.from_pretrained(local_dir or model_id)
     model = AutoModelForCausalLM.from_pretrained(
         local_dir or model_id,
-        torch_dtype=dtype,
+        dtype=dtype,
         low_cpu_mem_usage=True,
     ).to(device)
     load_s = time.perf_counter() - t0
