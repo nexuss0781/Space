@@ -1,0 +1,29 @@
+name: Update HuggingFace model card
+
+on:
+  workflow_dispatch:
+
+env:
+  HF_USERNAME: Nexuss0781
+  TARGET_REPO: SPACE
+
+jobs:
+  card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install huggingface_hub
+        run: pip install --upgrade "huggingface_hub>=0.25"
+
+      - name: Push model card
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+        run: python models/upload/push_card.py
