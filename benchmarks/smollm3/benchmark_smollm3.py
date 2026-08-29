@@ -67,19 +67,19 @@ def load_transformers(model_id, local_dir, device, dtype, hf_token):
     }
 
 
-def load_llamacpp(gguf_dir, model_id, hf_token):
+def load_llamacpp(gguf_dir, gguf_repo, gguf_pattern, hf_token):
     os.environ.setdefault("HF_TOKEN", hf_token or "")
     from huggingface_hub import snapshot_download
     from llama_cpp import Llama
 
     t0 = time.perf_counter()
     local = snapshot_download(
-        repo_id="unsloth/SmolLM3-3B-GGUF",
-        allow_patterns=["*q4_k_m*.gguf"],
+        repo_id=gguf_repo,
+        allow_patterns=gguf_pattern,
         local_dir=gguf_dir,
     )
     gguf_path = next(
-        f for f in _walk_gguf(local) if "q4_k_m" in f
+        f for f in _walk_gguf(local) if "q4_k_m" in f.lower() or "Q4_K_M" in f
     )
     model = Llama(model_path=gguf_path, n_ctx=2048, verbose=False)
     load_s = time.perf_counter() - t0
@@ -163,7 +163,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-id", default="HuggingFaceTB/SmolLM3-3B")
     ap.add_argument("--local-dir", default="models/SmolLM3-3B")
-    ap.add_argument("--gguf-local-dir", default="gguf/SmolLM3-3B")
+    ap.add_argument("--gguf-local-dir", default="gguf/SmolLM2-360M-Instruct")
+    ap.add_argument("--gguf-repo", default="QuantFactory/SmolLM2-360M-Instruct-GGUF")
+    ap.add_argument("--gguf-pattern", default="*Q4_K_M*.gguf")
     ap.add_argument("--prompts-file", default="benchmarks/smollm3/prompts.txt")
     ap.add_argument("--report-dir", default="results")
     ap.add_argument("--max-new-tokens", type=int, default=256)
@@ -183,7 +185,7 @@ def main():
     print(f"[benchmark] backend choice: {'llama-cpp GGUF' if use_gguf else 'transformers'} (force_gguf={args.force_gguf})")
 
     if use_gguf:
-        ctx = load_llamacpp(args.gguf_local_dir, args.model_id, hf_token)
+        ctx = load_llamacpp(args.gguf_local_dir, args.gguf_repo, args.gguf_pattern, hf_token)
         gen = gen_llamacpp
     else:
         dtype = torch.bfloat16 if device == "cpu" else torch.float16

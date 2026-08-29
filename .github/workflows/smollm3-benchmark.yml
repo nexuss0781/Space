@@ -1,4 +1,4 @@
-name: SmolLM3-3B Benchmark
+name: SmolLM2-360M Benchmark (micro tier)
 
 on:
   workflow_dispatch:
@@ -8,16 +8,17 @@ on:
       - '.github/workflows/smollm3-benchmark.yml'
 
 env:
-  MODEL_ID: HuggingFaceTB/SmolLM3-3B
-  MODEL_DIR: models/SmolLM3-3B
-  GGUF_DIR: gguf/SmolLM3-3B
+  MODEL_ID: HuggingFaceTB/SmolLM2-360M-Instruct
+  GGUF_REPO: QuantFactory/SmolLM2-360M-Instruct-GGUF
+  GGUF_PATTERN: '*Q4_K_M*.gguf'
+  GGUF_DIR: gguf/SmolLM2-360M-Instruct
   MAX_NEW_TOKENS: "256"
   REPORT_DIR: results
 
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,32 +28,29 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Cache models
+      - name: Cache GGUF
         uses: actions/cache@v4
         with:
-          path: |
-            models
-            gguf
-          key: smollm3-3b-v3
+          path: gguf
+          key: smollm2-360m-gguf-v1
 
-      - name: Install CPU deps
+      - name: Install deps
         run: |
           pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
-          pip install "transformers>=4.53,<5" accelerate psutil huggingface_hub
-          pip install llama-cpp-python
+          pip install llama-cpp-python psutil huggingface_hub
 
-      - name: Clone model repo (HF snapshot)
+      - name: Clone GGUF model (HF snapshot)
         run: |
           python - <<'PY'
           import os
           from huggingface_hub import snapshot_download
           snapshot_download(
-              repo_id=os.environ['MODEL_ID'],
-              local_dir=os.environ['MODEL_DIR'],
+              repo_id=os.environ['GGUF_REPO'],
+              allow_patterns=os.environ['GGUF_PATTERN'],
+              local_dir=os.environ['GGUF_DIR'],
           )
           PY
-          ls -laR "$MODEL_DIR" | head -40
+          find "$GGUF_DIR" -name '*.gguf' -exec ls -lh {} +
 
       - name: Run benchmark (10 prompts)
         env:
@@ -60,8 +58,9 @@ jobs:
         run: |
           python benchmarks/smollm3/benchmark_smollm3.py \
             --model-id "$MODEL_ID" \
-            --local-dir "$MODEL_DIR" \
             --gguf-local-dir "$GGUF_DIR" \
+            --gguf-repo "$GGUF_REPO" \
+            --gguf-pattern "$GGUF_PATTERN" \
             --prompts-file benchmarks/smollm3/prompts.txt \
             --report-dir "$REPORT_DIR" \
             --max-new-tokens "$MAX_NEW_TOKENS" \
@@ -70,7 +69,7 @@ jobs:
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: smollm3-benchmark
+          name: smollm2-360m-benchmark
           path: |
             results/**/*
           if-no-files-found: error
