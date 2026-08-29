@@ -159,7 +159,7 @@ def main():
 
     rows = []
     for i, (img_rel, prompt) in enumerate(tasks, 1):
-        img = os.path.join(args.images_dir, img_rel)
+        img = os.path.join(args.images_dir, os.path.basename(img_rel))
         r = run_mtmd(args.mtmd_bin, model_path, mmproj_path, img, prompt, args.ctx,
                  args.max_new_tokens, os.path.join(args.report_dir, "raw", args.name))
         r.update({"index": i, "image": img_rel, "prompt": prompt})
