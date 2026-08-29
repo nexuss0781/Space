@@ -20,7 +20,7 @@
 
 ## Selected
 
-| Modality | Micro (always-on) | Quality (swappable) |
+| Modality | Micro (always-on) | Quality |
 |---|---|---|
 | Text | **SmolLM2-360M-Instruct** (q4_k_m, 57.7 tok/s) | **Qwen2.5-3B-Instruct** (q4_k_m, 13.4 tok/s) |
 | Vision | **SmolVLM2-500M-Video-Instruct** (q8_0, 67.2 tok/s) | **SmolVLM2-2.2B-Instruct** (q4_k_m, 19.2 tok/s) |
