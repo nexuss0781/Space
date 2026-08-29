@@ -1,0 +1,37 @@
+name: Nexuss-AO production smoke
+
+on:
+  push:
+    paths: ["nexuss_ao/**", "tests/**", "pyproject.toml", ".github/workflows/nexuss-ao-smoke.yml"]
+  pull_request:
+    paths: ["nexuss_ao/**", "tests/**", "pyproject.toml", ".github/workflows/nexuss-ao-smoke.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest
+      - name: Run deterministic unit and integration tests
+        run: python -m pytest -q --junitxml=results/nexuss-ao-junit.xml
+      - name: Run CLI smoke
+        run: |
+          mkdir -p results
+          python -m nexuss_ao.cli --smoke --text "Describe the supplied evidence." > results/nexuss-ao-smoke.json
+      - name: Validate JSON artifact
+        run: python -c 'import json; json.load(open("results/nexuss-ao-smoke.json"))'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nexuss-ao-smoke-${{ github.sha }}
+          path: results/
+          if-no-files-found: error
