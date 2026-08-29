@@ -53,20 +53,27 @@ def download(source_repo, model_file, mmproj_file, local_dir):
     return model_path, mmproj_path
 
 
-def run_mtmd(mtmd_bin, model_path, mmproj_path, image_path, prompt, ctx, max_new):
+def run_mtmd(mtmd_bin, model_path, mmproj_path, image_path, prompt, ctx, max_new, raw_dir):
     cmd = [
         mtmd_bin, "-m", str(model_path), "--mmproj", str(mmproj_path),
         "-c", str(ctx), "--image", str(image_path),
         "-p", prompt, "-n", str(max_new), "-t", "4", "--seed", "42",
     ]
+    env = dict(os.environ)
+    env["LLAMA_PERF"] = "1"
     t0 = time.perf_counter()
     proc = subprocess.run(
         ["/usr/bin/time", "-v", *cmd],
-        capture_output=True, text=True, timeout=600,
+        capture_output=True, text=True, env=env, timeout=600,
     )
     wall = time.perf_counter() - t0
     out = proc.stdout
     err = proc.stderr
+
+    pathlib.Path(raw_dir).mkdir(parents=True, exist_ok=True)
+    pathlib.Path(raw_dir, f"{pathlib.Path(image_path).name}.out").write_text(out)
+    pathlib.Path(raw_dir, f"{pathlib.Path(image_path).name}.err").write_text(err)
+    print(f"    [raw sample] out={out[:150]!r} err={err[:150]!r}")
 
     tps = None
     for m in re.finditer(r"([\d.]+) tokens per second", out + "\n" + err):
@@ -76,6 +83,10 @@ def run_mtmd(mtmd_bin, model_path, mmproj_path, image_path, prompt, ctx, max_new
     if m:
         eval_ms = round(float(m.group(1)), 1)
         out_toks = int(m.group(2))
+    if out_toks is None:
+        m = re.search(r"total time\s*=\s*([\d.]+) ms\s*/\s*(\d+)\s*tokens", out + "\n" + err)
+        if m:
+            out_toks = int(m.group(2))
 
     rss = None
     m = re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)", err)
@@ -149,7 +160,8 @@ def main():
     rows = []
     for i, (img_rel, prompt) in enumerate(tasks, 1):
         img = os.path.join(args.images_dir, img_rel)
-        r = run_mtmd(args.mtmd_bin, model_path, mmproj_path, img, prompt, args.ctx, args.max_new_tokens)
+        r = run_mtmd(args.mtmd_bin, model_path, mmproj_path, img, prompt, args.ctx,
+                 args.max_new_tokens, os.path.join(args.report_dir, "raw", args.name))
         r.update({"index": i, "image": img_rel, "prompt": prompt})
         rows.append(r)
         print(f"  [{i:02d}] {img_rel} | out={r['output_tokens']} tok | eval={r['eval_ms']} ms"
