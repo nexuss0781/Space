@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Upload benchmarked Q4_K_M GGUF models into a single HuggingFace repo.
+"""Upload benchmarked GGUF models into a single HuggingFace repo.
+
+Supports text (single GGUF) and vision (LLM GGUF + mmproj GGUF) entries.
 
 Environment:
   HF_TOKEN  - write token (GitHub Actions secret)
@@ -8,6 +10,7 @@ Environment:
   DELETE_REPOS - optional comma-separated repo_ids to delete first
 """
 
+import fnmatch
 import os
 import pathlib
 
@@ -15,16 +18,34 @@ from huggingface_hub import HfApi, snapshot_download
 
 MODELS = [
     {
+        "kind": "text",
         "source": "QuantFactory/SmolLM2-360M-Instruct-GGUF",
         "pattern": "*Q4_K_M*.gguf",
         "base_model": "HuggingFaceTB/SmolLM2-360M-Instruct",
         "license": "apache-2.0",
     },
     {
+        "kind": "text",
         "source": "QuantFactory/Qwen2.5-3B-Instruct-GGUF",
         "pattern": "*Q4_K_M*.gguf",
         "base_model": "Qwen/Qwen2.5-3B-Instruct",
         "license": "qwen-research",
+    },
+    {
+        "kind": "vision",
+        "source": "ggml-org/SmolVLM2-2.2B-Instruct-GGUF",
+        "pattern": "SmolVLM2-2.2B-Instruct-Q4_K_M.gguf",
+        "mmproj": "mmproj-SmolVLM2-2.2B-Instruct-f16.gguf",
+        "base_model": "HuggingFaceTB/SmolVLM2-2.2B-Instruct",
+        "license": "apache-2.0",
+    },
+    {
+        "kind": "vision",
+        "source": "ggml-org/SmolVLM2-500M-Video-Instruct-GGUF",
+        "pattern": "SmolVLM2-500M-Video-Instruct-Q8_0.gguf",
+        "mmproj": "mmproj-SmolVLM2-500M-Video-Instruct-f16.gguf",
+        "base_model": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
+        "license": "apache-2.0",
     },
 ]
 
@@ -50,39 +71,66 @@ def main():
 
     uploaded = []
     for m in MODELS:
+        patterns = [m["pattern"]]
+        if m.get("mmproj"):
+            patterns.append(m["mmproj"])
         local = snapshot_download(
             repo_id=m["source"],
-            allow_patterns=m["pattern"],
+            allow_patterns=patterns,
             local_dir=f"models/{m['source'].split('/')[-1]}",
         )
-        gguf = next(pathlib.Path(local).rglob("*.gguf"))
-        size_gb = round(gguf.stat().st_size / 1e9, 2)
-        print(f"[upload] gguf: {gguf.name} ({size_gb} GB) -> {target_id}")
+        files = list(pathlib.Path(local).rglob("*.gguf"))
+        model_gguf = next(f for f in files if fnmatch.fnmatch(f.name, m["pattern"]))
+        mmproj_path = next(
+            (f for f in files if m.get("mmproj") and f.name == m["mmproj"]), None
+        )
+        size_gb = round(model_gguf.stat().st_size / 1e9, 2)
+        print(f"[upload] {m['kind']}: {model_gguf.name} ({size_gb} GB) -> {target_id}")
 
         api.upload_file(
-            path_or_fileobj=str(gguf),
-            path_in_repo=gguf.name,
+            path_or_fileobj=str(model_gguf),
+            path_in_repo=model_gguf.name,
             repo_id=target_id,
-            commit_message=f"Upload {gguf.name} (Q4_K_M)",
+            commit_message=f"Upload {model_gguf.name}",
         )
+        extra = ""
+        if mmproj_path is not None:
+            api.upload_file(
+                path_or_fileobj=str(mmproj_path),
+                path_in_repo=mmproj_path.name,
+                repo_id=target_id,
+                commit_message=f"Upload {mmproj_path.name}",
+            )
+            extra = f" + `{mmproj_path.name}`"
         uploaded.append(
-            f"- **{m['base_model']}** - `{gguf.name}` - {size_gb} GB - license: {m['license']}"
+            f"- **{m['base_model']}** - `{model_gguf.name}`{extra} - {size_gb} GB"
+            f" - license: {m['license']} - {m['kind']}"
         )
 
     readme = f"""---
 license: other
-pipeline_tag: text-generation
+pipeline_tag: image-text-to-text
+tags:
+  - text-generation
+  - image-text-to-text
 quantized_by: Nexuss0781
 ---
 
 # SPACE
 
-Single repository holding the Q4_K_M (llama.cpp) GGUF weights benchmarked in the
-Space GitHub Actions pipeline.
+Single repository holding the GGUF weights (llama.cpp) benchmarked in the
+Space GitHub Actions pipeline. Vision models include their `mmproj` image
+encoder and run with `llama-mtmd-cli`.
 
 ## Models
 
-""" + "\n".join(uploaded) + """
+Text (`text-generation`):
+
+""" + "\n".join(u for u in uploaded if u.rsplit(" ", 1)[1] == "text") + """
+
+Vision (`image-text-to-text`, use alongside the `mmproj`):
+
+""" + "\n".join(u for u in uploaded if u.rsplit(" ", 1)[1] == "vision") + """
 
 Benchmarks: https://github.com/nexuss0781/Space
 """
