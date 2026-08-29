@@ -58,15 +58,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: llama.cpp/build
-          key: llamacpp-mtmd-v1
+          key: llamacpp-mtmd-v2
 
       - name: Build llama.cpp (llama-mtmd-cli)
         run: |
-          if [ ! -f llama.cpp/build/bin/llama-mtmd-cli ]; then
+          build_mtmd() {
             rm -rf llama.cpp
             git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
-            cmake -S llama.cpp -B llama.cpp/build -DLLAMA_BUILD_COMMON=ON
+            cmake -S llama.cpp -B llama.cpp/build -DLLAMA_BUILD_COMMON=ON -DGGML_NATIVE=OFF
             cmake --build llama.cpp/build --target llama-mtmd-cli -j 4
+          }
+          if [ ! -f llama.cpp/build/bin/llama-mtmd-cli ]; then
+            build_mtmd
+          elif ! llama.cpp/build/bin/llama-mtmd-cli -h >/dev/null 2>&1; then
+            echo "cached build not executable on this runner; rebuilding portable"
+            build_mtmd
           fi
           ls -la llama.cpp/build/bin/llama-mtmd-cli
 
