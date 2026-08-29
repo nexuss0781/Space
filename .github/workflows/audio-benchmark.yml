@@ -47,8 +47,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test-mode filter (single candidate)
-        if: ${{ inputs.only != '' && matrix.name != inputs.only }}
-        run: echo "Skipping ${{ matrix.name }} (test mode: ${{ inputs.only }})"
+        if: inputs.only != '' && matrix.name != inputs.only
+        run: echo "skip (test mode)"
 
       - name: Setup Python
         uses: actions/setup-python@v5
