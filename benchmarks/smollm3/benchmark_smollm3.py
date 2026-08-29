@@ -13,7 +13,11 @@ import time
 from datetime import datetime, timezone
 
 import psutil
-import torch
+
+try:
+    import torch
+except ModuleNotFoundError:
+    torch = None
 
 
 def system_info():
@@ -24,10 +28,10 @@ def system_info():
         "cpu_cores": os.cpu_count(),
         "total_ram_gb": round(psutil.virtual_memory().total / 1e9, 2),
         "python": platform.python_version(),
-        "torch": torch.__version__,
-        "cuda_available": torch.cuda.is_available(),
+        "torch": (torch.__version__ if torch else "not installed"),
+        "cuda_available": bool(torch and torch.cuda.is_available()),
     }
-    if torch.cuda.is_available():
+    if torch and torch.cuda.is_available():
         info["gpu"] = torch.cuda.get_device_name(0)
         info["gpu_vram_gb"] = round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2)
     return info
@@ -176,9 +180,9 @@ def main():
     os.makedirs(args.report_dir, exist_ok=True)
 
     info = system_info()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch and torch.cuda.is_available() else "cpu"
     avail_ram_gb = round(psutil.virtual_memory().available / 1e9, 2)
-    use_gguf = args.force_gguf or (device == "cpu" and avail_ram_gb < 9.0)
+    use_gguf = args.force_gguf or (torch is None) or (device == "cpu" and avail_ram_gb < 9.0)
 
     print(f"[benchmark] machine: {info['machine']} | {info['cpu']} | {info['cpu_cores']} cores")
     print(f"[benchmark] total RAM: {info['total_ram_gb']} GB | available: {avail_ram_gb} GB | device: {device}")
