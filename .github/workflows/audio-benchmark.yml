@@ -1,0 +1,125 @@
+name: Audio Benchmark (5 candidates)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Run a single candidate (test mode). Leave empty to run all 5.'
+        required: false
+        default: ''
+
+env:
+  MTMD_BIN: llama.cpp/build/bin/llama-mtmd-cli
+  REPORT_DIR: results/audio
+  MAX_NEW_TOKENS: "128"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: qwen3-asr-0.6b
+            repo: ggml-org/Qwen3-ASR-0.6B-GGUF
+            model: Qwen3-ASR-0.6B-Q8_0.gguf
+            mmproj: mmproj-Qwen3-ASR-0.6B-Q8_0.gguf
+          - name: qwen3-asr-1.7b
+            repo: ggml-org/Qwen3-ASR-1.7B-GGUF
+            model: Qwen3-ASR-1.7B-Q8_0.gguf
+            mmproj: mmproj-Qwen3-ASR-1.7B-Q8_0.gguf
+          - name: ultravox-1b
+            repo: ggml-org/ultravox-v0_5-llama-3_2-1b-GGUF
+            model: Llama-3.2-1B-Instruct-Q4_K_M.gguf
+            mmproj: mmproj-ultravox-v0_5-llama-3_2-1b-f16.gguf
+          - name: qwen2.5-omni-3b
+            repo: ggml-org/Qwen2.5-Omni-3B-GGUF
+            model: Qwen2.5-Omni-3B-Q4_K_M.gguf
+            mmproj: mmproj-Qwen2.5-Omni-3B-f16.gguf
+          - name: ultravox-8b
+            repo: ggml-org/ultravox-v0_5-llama-3_1-8b-GGUF
+            model: Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf
+            mmproj: mmproj-ultravox-v0_5-llama-3_1-8b-f16.gguf
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test-mode filter (single candidate)
+        if: ${{ inputs.only != '' && matrix.name != inputs.only }}
+        run: echo "Skipping ${{ matrix.name }} (test mode: ${{ inputs.only }})"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install --upgrade psutil huggingface_hub
+
+      - name: Cache llama.cpp build
+        uses: actions/cache@v4
+        with:
+          path: llama.cpp/build
+          key: llamacpp-mtmd-v2
+
+      - name: Build llama.cpp (llama-mtmd-cli)
+        run: |
+          build_mtmd() {
+            rm -rf llama.cpp
+            git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
+            cmake -S llama.cpp -B llama.cpp/build -DLLAMA_BUILD_COMMON=ON -DGGML_NATIVE=OFF
+            cmake --build llama.cpp/build --target llama-mtmd-cli -j 4
+          }
+          if [ ! -f llama.cpp/build/bin/llama-mtmd-cli ]; then
+            build_mtmd
+          elif ! llama.cpp/build/bin/llama-mtmd-cli -h >/dev/null 2>&1; then
+            echo "cached build not executable on this runner; rebuilding portable"
+            build_mtmd
+          fi
+          ls -la llama.cpp/build/bin/llama-mtmd-cli
+
+      - name: Run audio benchmark (10 speech clips)
+        run: |
+          python benchmarks/audio/benchmark_audio.py \
+            --name "${{ matrix.name }}" \
+            --source-repo "${{ matrix.repo }}" \
+            --model-file "${{ matrix.model }}" \
+            --mmproj-file "${{ matrix.mmproj }}" \
+            --mtmd-bin "$MTMD_BIN" \
+            --report-dir "$REPORT_DIR" \
+            --max-new-tokens "$MAX_NEW_TOKENS"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-${{ matrix.name }}
+          path: |
+            ${{ env.REPORT_DIR }}/**/*
+          if-no-files-found: error
+
+  merge:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all model reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: audio-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Merge into single paper
+        run: |
+          python benchmarks/audio/merge_audio.py artifacts --out reports/audio-benchmark.md
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-merged-report
+          path: reports/audio-benchmark.md
+          if-no-files-found: error
