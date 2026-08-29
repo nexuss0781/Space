@@ -26,6 +26,26 @@ jobs:
             model: SmolVLM2-500M-Video-Instruct-Q8_0.gguf
             mmproj: mmproj-SmolVLM2-500M-Video-Instruct-f16.gguf
             chat-template: ""
+          - name: smolvlm-500m
+            repo: ggml-org/SmolVLM-500M-Instruct-GGUF
+            model: SmolVLM-500M-Instruct-Q8_0.gguf
+            mmproj: mmproj-SmolVLM-500M-Instruct-f16.gguf
+            chat-template: ""
+          - name: smolvlm-2b
+            repo: ggml-org/SmolVLM-Instruct-GGUF
+            model: SmolVLM-Instruct-Q4_K_M.gguf
+            mmproj: mmproj-SmolVLM-Instruct-f16.gguf
+            chat-template: ""
+          - name: moondream2
+            repo: cjpais/moondream2-llamafile
+            model: moondream2-050824-q8.gguf
+            mmproj: moondream2-mmproj-050824-f16.gguf
+            chat-template: vicuna
+          - name: gemma3-4b
+            repo: ggml-org/gemma-3-4b-it-GGUF
+            model: gemma-3-4b-it-Q4_K_M.gguf
+            mmproj: mmproj-model-f16.gguf
+            chat-template: ""
 
     steps:
       - name: Checkout
