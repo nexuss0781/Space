@@ -1,4 +1,4 @@
-name: SmolLM2-360M Benchmark (micro tier)
+name: SmolLM GGUF Benchmark (micro + 3B)
 
 on:
   workflow_dispatch:
@@ -8,10 +8,6 @@ on:
       - '.github/workflows/smollm3-benchmark.yml'
 
 env:
-  MODEL_ID: HuggingFaceTB/SmolLM2-360M-Instruct
-  GGUF_REPO: QuantFactory/SmolLM2-360M-Instruct-GGUF
-  GGUF_PATTERN: '*Q4_K_M*.gguf'
-  GGUF_DIR: gguf/SmolLM2-360M-Instruct
   MAX_NEW_TOKENS: "256"
   REPORT_DIR: results
 
@@ -19,6 +15,21 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: smollm2-360m
+            model_id: HuggingFaceTB/SmolLM2-360M-Instruct
+            gguf_repo: QuantFactory/SmolLM2-360M-Instruct-GGUF
+            gguf_pattern: '*Q4_K_M*.gguf'
+            gguf_dir: gguf/SmolLM2-360M-Instruct
+          - name: smollm3-3b
+            model_id: HuggingFaceTB/SmolLM3-3B
+            gguf_repo: unsloth/SmolLM3-3B-GGUF
+            gguf_pattern: '*Q4_K_M*.gguf'
+            gguf_dir: gguf/SmolLM3-3B
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +43,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: gguf
-          key: smollm2-360m-gguf-v1
+          key: smollm-gguf-${{ matrix.name }}-v1
 
       - name: Install deps
         run: |
@@ -40,6 +51,10 @@ jobs:
           pip install llama-cpp-python psutil huggingface_hub
 
       - name: Clone GGUF model (HF snapshot)
+        env:
+          GGUF_REPO: ${{ matrix.gguf_repo }}
+          GGUF_PATTERN: ${{ matrix.gguf_pattern }}
+          GGUF_DIR: ${{ matrix.gguf_dir }}
         run: |
           python - <<'PY'
           import os
@@ -55,6 +70,10 @@ jobs:
       - name: Run benchmark (10 prompts)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          MODEL_ID: ${{ matrix.model_id }}
+          GGUF_DIR: ${{ matrix.gguf_dir }}
+          GGUF_REPO: ${{ matrix.gguf_repo }}
+          GGUF_PATTERN: ${{ matrix.gguf_pattern }}
         run: |
           python benchmarks/smollm3/benchmark_smollm3.py \
             --model-id "$MODEL_ID" \
@@ -69,7 +88,7 @@ jobs:
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: smollm2-360m-benchmark
+          name: ${{ matrix.name }}-benchmark
           path: |
             results/**/*
           if-no-files-found: error

@@ -165,7 +165,7 @@ def toks_per_sec(out_tokens, elapsed):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model-id", default="HuggingFaceTB/SmolLM3-3B")
+    ap.add_argument("--model-id", default="HuggingFaceTB/SmolLM2-360M-Instruct")
     ap.add_argument("--local-dir", default="models/SmolLM3-3B")
     ap.add_argument("--gguf-local-dir", default="gguf/SmolLM2-360M-Instruct")
     ap.add_argument("--gguf-repo", default="QuantFactory/SmolLM2-360M-Instruct-GGUF")
