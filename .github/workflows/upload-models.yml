@@ -1,0 +1,48 @@
+name: Upload GGUF models to HuggingFace
+
+on:
+  workflow_dispatch:
+
+env:
+  HF_USERNAME: Nexuss0781
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: SmolLM2-360M-Instruct-GGUF
+            source: QuantFactory/SmolLM2-360M-Instruct-GGUF
+            pattern: '*Q4_K_M*.gguf'
+            base_model: HuggingFaceTB/SmolLM2-360M-Instruct
+            license: apache-2.0
+          - name: Qwen2.5-3B-Instruct-GGUF
+            source: QuantFactory/Qwen2.5-3B-Instruct-GGUF
+            pattern: '*Q4_K_M*.gguf'
+            base_model: Qwen/Qwen2.5-3B-Instruct
+            license: qwen-research
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install huggingface_hub
+        run: pip install --upgrade "huggingface_hub>=0.25"
+
+      - name: Upload GGUF to HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HUGGINGFACE_TOKEN }}
+          REPO_NAME: ${{ matrix.name }}
+          SOURCE_REPO: ${{ matrix.source }}
+          GGUF_PATTERN: ${{ matrix.pattern }}
+          BASE_MODEL: ${{ matrix.base_model }}
+          MODEL_LICENSE: ${{ matrix.license }}
+        run: python models/upload/upload_gguf.py
