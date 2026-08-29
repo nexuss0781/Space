@@ -62,8 +62,9 @@ jobs:
 
       - name: Build llama.cpp (llama-mtmd-cli)
         run: |
-          test -d llama.cpp/.git || git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
           if [ ! -f llama.cpp/build/bin/llama-mtmd-cli ]; then
+            rm -rf llama.cpp
+            git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
             cmake -S llama.cpp -B llama.cpp/build -DLLAMA_BUILD_COMMON=ON
             cmake --build llama.cpp/build --target llama-mtmd-cli -j 4
           fi
