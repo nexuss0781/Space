@@ -1,0 +1,114 @@
+name: Vision Benchmark (5 candidates)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'benchmarks/vision/**'
+      - '.github/workflows/vision-benchmark.yml'
+
+env:
+  MTMD_BIN: llama.cpp/build/bin/llama-mtmd-cli
+  REPORT_DIR: results/vision
+  MAX_NEW_TOKENS: "128"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: smolvlm2-500m
+            repo: ggml-org/SmolVLM2-500M-Video-Instruct-GGUF
+            model: SmolVLM2-500M-Video-Instruct-Q8_0.gguf
+            mmproj: mmproj-SmolVLM2-500M-Video-Instruct-f16.gguf
+          - name: smolvlm-2b
+            repo: ggml-org/SmolVLM-Instruct-GGUF
+            model: SmolVLM-Instruct-Q4_K_M.gguf
+            mmproj: mmproj-SmolVLM-Instruct-f16.gguf
+          - name: smolvlm-500m
+            repo: ggml-org/SmolVLM-500M-Instruct-GGUF
+            model: SmolVLM-500M-Instruct-Q8_0.gguf
+            mmproj: mmproj-SmolVLM-500M-Instruct-f16.gguf
+          - name: moondream2
+            repo: cjpais/moondream2-llamafile
+            model: moondream2-050824-q8.gguf
+            mmproj: moondream2-mmproj-050824-f16.gguf
+          - name: gemma3-4b
+            repo: ggml-org/gemma-3-4b-it-GGUF
+            model: gemma-3-4b-it-Q4_K_M.gguf
+            mmproj: mmproj-model-f16.gguf
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install --upgrade psutil huggingface_hub
+
+      - name: Cache llama.cpp build
+        uses: actions/cache@v4
+        with:
+          path: llama.cpp/build
+          key: llamacpp-mtmd-v1
+
+      - name: Build llama.cpp (llama-mtmd-cli)
+        run: |
+          test -d llama.cpp/.git || git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
+          if [ ! -f llama.cpp/build/bin/llama-mtmd-cli ]; then
+            cmake -S llama.cpp -B llama.cpp/build -DLLAMA_BUILD_COMMON=ON
+            cmake --build llama.cpp/build --target llama-mtmd-cli -j 4
+          fi
+          ls -la llama.cpp/build/bin/llama-mtmd-cli
+
+      - name: Run vision benchmark (10 image tasks)
+        run: |
+          python benchmarks/vision/benchmark_vision.py \
+            --name "${{ matrix.name }}" \
+            --source-repo "${{ matrix.repo }}" \
+            --model-file "${{ matrix.model }}" \
+            --mmproj-file "${{ matrix.mmproj }}" \
+            --mtmd-bin "$MTMD_BIN" \
+            --report-dir "$REPORT_DIR" \
+            --max-new-tokens "$MAX_NEW_TOKENS"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vision-${{ matrix.name }}
+          path: |
+            ${{ env.REPORT_DIR }}/**/*
+          if-no-files-found: error
+
+  merge:
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all model reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: vision-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Merge into single paper
+        run: |
+          python benchmarks/vision/merge_vision.py artifacts --out reports/vision-benchmark.md
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vision-merged-report
+          path: reports/vision-benchmark.md
+          if-no-files-found: error
