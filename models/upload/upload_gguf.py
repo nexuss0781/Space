@@ -47,6 +47,22 @@ MODELS = [
         "base_model": "HuggingFaceTB/SmolVLM2-500M-Video-Instruct",
         "license": "apache-2.0",
     },
+    {
+        "kind": "audio",
+        "source": "ggml-org/Qwen3-ASR-0.6B-GGUF",
+        "pattern": "Qwen3-ASR-0.6B-Q8_0.gguf",
+        "mmproj": "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf",
+        "base_model": "Qwen/Qwen3-ASR-0.6B",
+        "license": "apache-2.0",
+    },
+    {
+        "kind": "audio",
+        "source": "ggml-org/Qwen3-ASR-1.7B-GGUF",
+        "pattern": "Qwen3-ASR-1.7B-Q8_0.gguf",
+        "mmproj": "mmproj-Qwen3-ASR-1.7B-Q8_0.gguf",
+        "base_model": "Qwen/Qwen3-ASR-1.7B",
+        "license": "apache-2.0",
+    },
 ]
 
 
@@ -119,7 +135,7 @@ quantized_by: Nexuss0781
 # SPACE
 
 Single repository holding the GGUF weights (llama.cpp) benchmarked in the
-Space GitHub Actions pipeline. Vision models include their `mmproj` image
+Space GitHub Actions pipeline. Vision and audio models include their `mmproj`
 encoder and run with `llama-mtmd-cli`.
 
 ## Models
@@ -131,6 +147,10 @@ Text (`text-generation`):
 Vision (`image-text-to-text`, use alongside the `mmproj`):
 
 """ + "\n".join(u for u in uploaded if u.rsplit(" ", 1)[1] == "vision") + """
+
+Audio (`automatic-speech-recognition`, use alongside the `mmproj`):
+
+""" + "\n".join(u for u in uploaded if u.rsplit(" ", 1)[1] == "audio") + """
 
 Benchmarks: https://github.com/nexuss0781/Space
 """

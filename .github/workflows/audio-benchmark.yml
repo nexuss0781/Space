@@ -15,6 +15,7 @@ env:
 
 jobs:
   benchmark:
+    if: ${{ inputs.only == '' || matrix.name == inputs.only }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -45,10 +46,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Test-mode filter (single candidate)
-        if: inputs.only != '' && matrix.name != inputs.only
-        run: echo "skip (test mode)"
 
       - name: Setup Python
         uses: actions/setup-python@v5
