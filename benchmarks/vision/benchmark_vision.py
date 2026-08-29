@@ -53,12 +53,15 @@ def download(source_repo, model_file, mmproj_file, local_dir):
     return model_path, mmproj_path
 
 
-def run_mtmd(mtmd_bin, model_path, mmproj_path, image_path, prompt, ctx, max_new, raw_dir):
+def run_mtmd(mtmd_bin, model_path, mmproj_path, image_path, prompt, ctx, max_new, raw_dir,
+             chat_template=None):
     cmd = [
         mtmd_bin, "-m", str(model_path), "--mmproj", str(mmproj_path),
         "-c", str(ctx), "--image", str(image_path),
-        "-p", prompt, "-n", str(max_new), "-t", "4", "--seed", "42",
+        "-p", prompt, "-n", str(max_new), "-t", "4", "--seed", "42", "-lv", "5",
     ]
+    if chat_template:
+        cmd += ["--chat-template", chat_template]
     env = dict(os.environ)
     env["LLAMA_PERF"] = "1"
     t0 = time.perf_counter()
@@ -136,6 +139,7 @@ def main():
     ap.add_argument("--max-new-tokens", type=int, default=128)
     ap.add_argument("--ctx", type=int, default=8192)
     ap.add_argument("--local-dir", default="models/vision")
+    ap.add_argument("--chat-template", default="")
     args = ap.parse_args()
 
     os.makedirs(args.report_dir, exist_ok=True)
@@ -161,7 +165,8 @@ def main():
     for i, (img_rel, prompt) in enumerate(tasks, 1):
         img = os.path.join(args.images_dir, os.path.basename(img_rel))
         r = run_mtmd(args.mtmd_bin, model_path, mmproj_path, img, prompt, args.ctx,
-                 args.max_new_tokens, os.path.join(args.report_dir, "raw", args.name))
+                 args.max_new_tokens, os.path.join(args.report_dir, "raw", args.name),
+                 chat_template=(args.chat_template or None))
         r.update({"index": i, "image": img_rel, "prompt": prompt})
         rows.append(r)
         print(f"  [{i:02d}] {img_rel} | out={r['output_tokens']} tok | eval={r['eval_ms']} ms"
