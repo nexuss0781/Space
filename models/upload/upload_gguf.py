@@ -71,7 +71,7 @@ quantized_by: Nexuss0781
         repo_id=repo_id,
         commit_message=f"Upload {gguf.name} (Q4_K_M)",
     )
-    print(f"[upload] commit: {commit.commit_hash}")
+    print(f"[upload] commit: {commit.commit_url}")
     print(f"[upload] DONE: https://huggingface.co/{repo_id}/blob/main/{gguf.name}")
 
 
