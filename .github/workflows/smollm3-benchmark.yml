@@ -19,16 +19,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: smollm2-360m
-            model_id: HuggingFaceTB/SmolLM2-360M-Instruct
-            gguf_repo: QuantFactory/SmolLM2-360M-Instruct-GGUF
+          - name: qwen2.5-3b
+            model_id: Qwen/Qwen2.5-3B-Instruct
+            gguf_repo: QuantFactory/Qwen2.5-3B-Instruct-GGUF
             gguf_pattern: '*Q4_K_M*.gguf'
-            gguf_dir: gguf/SmolLM2-360M-Instruct
-          - name: smollm3-3b
-            model_id: HuggingFaceTB/SmolLM3-3B
-            gguf_repo: unsloth/SmolLM3-3B-GGUF
-            gguf_pattern: '*Q4_K_M*.gguf'
-            gguf_dir: gguf/SmolLM3-3B
+            gguf_dir: gguf/Qwen2.5-3B-Instruct
 
     steps:
       - name: Checkout
