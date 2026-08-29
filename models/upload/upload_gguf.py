@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Upload the benchmarked Q4_K_M GGUF model to HuggingFace Hub.
+"""Upload benchmarked Q4_K_M GGUF models into a single HuggingFace repo.
 
-Reads everything from the environment (set by the GitHub Actions matrix):
-  HF_TOKEN, HF_USERNAME, REPO_NAME, SOURCE_REPO, GGUF_PATTERN,
-  BASE_MODEL, MODEL_LICENSE
+Environment:
+  HF_TOKEN  - write token (GitHub Actions secret)
+  HF_USERNAME - hub username/org, e.g. Nexuss0781
+  TARGET_REPO - one repo that will hold all models, e.g. SPACE
+  DELETE_REPOS - optional comma-separated repo_ids to delete first
 """
 
 import os
@@ -11,68 +13,89 @@ import pathlib
 
 from huggingface_hub import HfApi, snapshot_download
 
+MODELS = [
+    {
+        "source": "QuantFactory/SmolLM2-360M-Instruct-GGUF",
+        "pattern": "*Q4_K_M*.gguf",
+        "base_model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+        "license": "apache-2.0",
+    },
+    {
+        "source": "QuantFactory/Qwen2.5-3B-Instruct-GGUF",
+        "pattern": "*Q4_K_M*.gguf",
+        "base_model": "Qwen/Qwen2.5-3B-Instruct",
+        "license": "qwen-research",
+    },
+]
+
 
 def main():
     token = os.environ["HF_TOKEN"]
     username = os.environ["HF_USERNAME"]
-    repo_name = os.environ["REPO_NAME"]
-    source = os.environ["SOURCE_REPO"]
-    pattern = os.environ["GGUF_PATTERN"]
-    base_model = os.environ["BASE_MODEL"]
-    model_license = os.environ["MODEL_LICENSE"]
+    target_repo = os.environ["TARGET_REPO"]
 
-    repo_id = f"{username}/{repo_name}"
     api = HfApi(token=token)
-
     who = api.whoami()
     print(f"[upload] authenticated as {who['name']}")
 
-    api.create_repo(repo_id=repo_id, repo_type="model", exist_ok=True)
-    print(f"[upload] repo ok: https://huggingface.co/{repo_id}")
+    for repo_id in [
+        r.strip() for r in os.environ.get("DELETE_REPOS", "").split(",") if r.strip()
+    ]:
+        print(f"[upload] deleting {repo_id} ...")
+        api.delete_repo(repo_id=repo_id, repo_type="model", missing_ok=True)
 
-    local = snapshot_download(
-        repo_id=source,
-        allow_patterns=pattern,
-        local_dir=f"models/{repo_name}",
-    )
-    ggufs = sorted(p for p in pathlib.Path(local).rglob("*.gguf"))
-    assert ggufs, "no .gguf matched"
-    gguf = ggufs[0]
-    print(f"[upload] gguf: {gguf} ({gguf.stat().st_size / 1e9:.2f} GB)")
+    target_id = f"{username}/{target_repo}"
+    api.create_repo(repo_id=target_id, repo_type="model", exist_ok=True)
+    print(f"[upload] target repo ok: https://huggingface.co/{target_id}")
+
+    uploaded = []
+    for m in MODELS:
+        local = snapshot_download(
+            repo_id=m["source"],
+            allow_patterns=m["pattern"],
+            local_dir=f"models/{m['source'].split('/')[-1]}",
+        )
+        gguf = next(pathlib.Path(local).rglob("*.gguf"))
+        size_gb = round(gguf.stat().st_size / 1e9, 2)
+        print(f"[upload] gguf: {gguf.name} ({size_gb} GB) -> {target_id}")
+
+        api.upload_file(
+            path_or_fileobj=str(gguf),
+            path_in_repo=gguf.name,
+            repo_id=target_id,
+            commit_message=f"Upload {gguf.name} (Q4_K_M)",
+        )
+        uploaded.append(
+            f"- **{m['base_model']}** - `{gguf.name}` - {size_gb} GB - license: {m['license']}"
+        )
 
     readme = f"""---
-license: {model_license}
-base_model: {base_model}
+license: other
+pipeline_tag: text-generation
 quantized_by: Nexuss0781
 ---
 
-# {repo_name}
+# SPACE
 
-4-bit k-quantized (Q4_K_M) GGUF of **{base_model}**.
+Single repository holding the Q4_K_M (llama.cpp) GGUF weights benchmarked in the
+Space GitHub Actions pipeline.
 
-- Quant type: Q4_K_M (llama.cpp)
-- Source quantizer: `{source}`
-- Uploaded from the Space GitHub Actions benchmark pipeline.
-- See `Space` repo: https://github.com/nexuss0781/Space
+## Models
+
+""" + "\n".join(uploaded) + """
+
+Benchmarks: https://github.com/nexuss0781/Space
 """
-
     readme_path = pathlib.Path("README.md")
     readme_path.write_text(readme)
-    api.upload_file(
+    commit = api.upload_file(
         path_or_fileobj=str(readme_path),
         path_in_repo="README.md",
-        repo_id=repo_id,
+        repo_id=target_id,
         commit_message="Add model card",
     )
-
-    commit = api.upload_file(
-        path_or_fileobj=str(gguf),
-        path_in_repo=gguf.name,
-        repo_id=repo_id,
-        commit_message=f"Upload {gguf.name} (Q4_K_M)",
-    )
-    print(f"[upload] commit: {commit.commit_url}")
-    print(f"[upload] DONE: https://huggingface.co/{repo_id}/blob/main/{gguf.name}")
+    print(f"[upload] README commit: {commit.commit_url}")
+    print(f"[upload] DONE: https://huggingface.co/{target_id}")
 
 
 if __name__ == "__main__":
