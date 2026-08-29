@@ -64,7 +64,8 @@ jobs:
             --gguf-local-dir "$GGUF_DIR" \
             --prompts-file benchmarks/smollm3/prompts.txt \
             --report-dir "$REPORT_DIR" \
-            --max-new-tokens "$MAX_NEW_TOKENS"
+            --max-new-tokens "$MAX_NEW_TOKENS" \
+            --force-gguf
 
       - name: Upload report
         uses: actions/upload-artifact@v4
