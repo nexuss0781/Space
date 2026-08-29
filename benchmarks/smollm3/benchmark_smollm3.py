@@ -105,9 +105,10 @@ def gen_transformers(ctx, prompt, max_new_tokens):
     device = ctx["device"]
     messages = [{"role": "user", "content": prompt}]
     inputs = tokenizer.apply_chat_template(
-        messages, add_generation_prompt=True, return_tensors="pt"
+        messages, add_generation_prompt=True, tokenize=True, return_dict=True,
+        return_tensors="pt",
     ).to(device)
-    prompt_tokens = inputs.shape[-1]
+    prompt_tokens = inputs["input_ids"].shape[-1]
 
     start = time.perf_counter()
     with torch.inference_mode():
@@ -116,7 +117,7 @@ def gen_transformers(ctx, prompt, max_new_tokens):
                                  pad_token_id=tokenizer.eos_token_id)
     elapsed = time.perf_counter() - start
 
-    new_ids = outputs[0][inputs.shape[-1]:]
+    new_ids = outputs[0][inputs["input_ids"].shape[-1]:]
     out_tokens = new_ids.shape[0]
     response = tokenizer.decode(new_ids, skip_special_tokens=True)
     ttft = _ttft_estimate(ctx, prompt, device)
@@ -127,7 +128,8 @@ def _ttft_estimate(ctx, prompt, device):
     tokenizer, model = ctx["tokenizer"], ctx["model"]
     messages = [{"role": "user", "content": prompt}]
     inputs = tokenizer.apply_chat_template(
-        messages, add_generation_prompt=True, return_tensors="pt"
+        messages, add_generation_prompt=True, tokenize=True, return_dict=True,
+        return_tensors="pt",
     ).to(device)
     start = time.perf_counter()
     with torch.inference_mode():
